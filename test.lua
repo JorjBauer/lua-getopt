@@ -3,6 +3,8 @@
 local getopt = require "getopt"
 local tu = require "tableUtils"
 
+print("Testing getopt version " .. getopt.version())
+
 local opts = {}
 
 --print(tu.dump(arg))

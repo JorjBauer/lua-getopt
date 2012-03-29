@@ -97,6 +97,23 @@ static void _free_args(int argc, char *argv[])
   free(argv);
 }
 
+/* version = getopt.version()                                            
+ */
+static int version(lua_State *l)
+{
+  int numargs = lua_gettop(l);
+  if (numargs != 0) {
+    lua_pushstring(l, "usage: getopt.version()");
+    lua_error(l);
+    return 0;
+  }
+
+  lua_pushstring(l, VERSION);
+
+  return 1;
+}
+
+
 /* bool result = getopt.std("opts", table)
  *
  * Uses the libc getopt() call and stuffs results in the given table.
@@ -162,6 +179,7 @@ static const luaL_reg meta[] = {
 
 /* function table for this module */
 static const struct luaL_reg methods[] = {
+  { "version",      version     },
   { "std",          getopt_std  },
   { NULL,           NULL        }
 };
