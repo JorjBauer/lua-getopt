@@ -16,6 +16,7 @@
 #endif
 
 #define ERROR(x) { lua_pushstring(l, x); lua_error(l); }
+#define getn(L,n) (luaL_checktype(L, n, LUA_TTABLE), luaL_getn(L, n))
 
 static void *_realloc_argv(char *argv[], int old_size, int new_size)
 {
@@ -381,9 +382,39 @@ static void _set_lua_variable(lua_State *l, char *name, int value)
   lua_setglobal(l, name);
 }
 
+/* Remove num args from args[], starting at [1] */
+static void _remove_args(lua_State *l, int num)
+{
+  int i;
+
+  /* Make sure there's something to do */
+  if (num == 0)
+    return;
+
+  lua_getglobal(l, "arg"); // push global 'arg' table on to stack
+  int tbl_idx = lua_gettop(l);
+  int max_element = getn(l, -1);
+
+  /* For old elements that are staying, move them down. */
+  for (i=num+1; i<=max_element; i++) {
+    lua_rawgeti(l, tbl_idx, i);
+    lua_rawseti(l, tbl_idx, i-num);
+  }
+  /* For any elements that moved but weren't replaced, remove them. */
+  for (i=max_element - num + 1; i<=max_element; i++) {
+    lua_pushnil(l);
+    lua_rawseti(l, tbl_idx, i);
+  }
+}
+
+
+
 /* bool result = getopt.long("opts", longopts_in, opts_out)
  *
  * Uses the libc getopt_long() call and stuffs results in the given table.
+ * Modifies the global arg[], removing any options that were processed by 
+ * getopt.long(). (This enables the caller to process the remaining arguemnts
+ * manually after a "--" argument.)
  */
 
 static int lgetopt_long(lua_State *l)
@@ -419,8 +450,8 @@ static int lgetopt_long(lua_State *l)
   while ((ch=getopt_long(argc, argv, optstring, longopts, &idx)) != -1) {
     char buf[2] = { ch, 0 };
 
-    if (ch == '?') {
-      /* This is the special "got a bad option" character. Don't put it 
+    if (ch == '?' || ch == ':') {
+      /* This is a special "got a bad option" character. Don't put it 
        * in the table of results; just record that there's a failure.
        * The getopt call will have emitted an error to stderr. */
       result = 0;
@@ -445,6 +476,9 @@ static int lgetopt_long(lua_State *l)
 
   _free_longopts(longopts, bound_variable_name, bound_variable_value);
   _free_args(argc, argv);
+
+  /* Update args[] to remove the arguments we parsed */
+  _remove_args(l, optind-1);
 
   /* Return 1 item on the stack (boolean) */
   lua_pushboolean(l, result);

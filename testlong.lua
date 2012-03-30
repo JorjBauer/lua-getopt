@@ -5,6 +5,8 @@ local tu = require "tableUtils"
 
 print("Testing getopt version " .. getopt.version())
 
+print("arg[] before: " .. tu.dump(arg))
+
 local longopts = { buffy = { has_arg = "no_argument",
 			       val = "b" },
 		   fluoride = { has_arg = "required_argument",
@@ -28,3 +30,4 @@ end
 print (tu.dump(retopts))
 print("daggerset: " .. daggerset)
 
+print("arg[] after: " .. tu.dump(arg))
