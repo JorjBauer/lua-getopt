@@ -23,7 +23,7 @@ CPATH=/usr/local/lib/lua/5.1
 BRANCH_VERSION=.branch_version
 BUILD_VERSION=.build_version
 TARGET=getopt.so
-OBJS=getopt.o luaabstract.o
+OBJS=getopt.o
 
 all: $(TARGET)
 
@@ -43,9 +43,7 @@ $(TARGET): version $(OBJS)
 	$(CC) $(CFLAGS) -DVERSION="\"$$(cat VERSION).$$(cat $(BRANCH_VERSION))-$$(cat $(BUILD_VERSION))\"" -fno-common -c $< -o $@
 
 # Dependencies
-getopt.c: luaabstract.c luaabstract.h
-
-luaabstract.c: luaabstract.h
+getopt.c: 
 
 # build_version stuff
 .PHONY: version branch_version

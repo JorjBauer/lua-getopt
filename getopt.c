@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#include "luaabstract.h"
-
 #define MODULENAME      "getopt"
 
 #ifndef VERSION
@@ -135,7 +133,7 @@ static int lgetopt_std(lua_State *l)
     ERROR("usage: getopt.std(optionstring, resulttable)");
   }
 
-  optstring = tostring(l, 1);
+  optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
   lua_getfield(l, LUA_GLOBALSINDEX, "arg");
@@ -195,7 +193,6 @@ static void _populate_option(lua_State *l,
   p->val = 0;
 
   lua_pushnil(l);
-
   while (lua_next(l, table_idx) != 0) {
     // key is -2; value is -1
     // Expected keys: "has_arg", "flag" (optional), "val" (one character or #)
@@ -226,7 +223,6 @@ static void _populate_option(lua_State *l,
 	} else {
 	  ERROR("error: flag must point to a string");
 	}
-
       } else if (strcmp(new_string, "val") == 0) {
 	if (lua_isnumber(l, -1)) {
 	  p->val = lua_tonumber(l, -1);
@@ -238,9 +234,8 @@ static void _populate_option(lua_State *l,
 	    p->val = val[0];
 	  }
 	}
-
-      } else {
-	ERROR("error: longopts must be {has_arg|flag|val}");
+      } else if (strcmp(new_string, "callback")) {
+	ERROR("error: longopts must be {has_arg|flag|val|callback}");
       }
 
     } else {
@@ -249,22 +244,23 @@ static void _populate_option(lua_State *l,
 
     lua_pop(l, 1);
   }
+
 }
 
 static const char *_safe_string(lua_State *l, int idx)
 {
-  const char *ret = NULL;
+  char *ret = NULL;
 
-  if (lua_type(l, -2) == LUA_TNUMBER) {
+  if (lua_type(l, idx) == LUA_TNUMBER) {
     const char *new_string;
-    lua_pushfstring(l, "%f", lua_tonumber(l, -2));
+    lua_pushfstring(l, "%f", lua_tonumber(l, idx));
     new_string = lua_tostring(l, -1);
     ret = malloc(strlen(new_string)+1);
     strcpy(ret, new_string);
     lua_pop(l, 1); /* Pop the fstring off the stack */
   }
-  else if (lua_type(l, -2) == LUA_TSTRING) {
-    const char *new_string = lua_tostring(l, -2);
+  else if (lua_type(l, idx) == LUA_TSTRING) {
+    const char *new_string = lua_tostring(l, idx);
     ret = malloc(strlen(new_string)+1);
     strcpy(ret, new_string);
   }
@@ -323,7 +319,7 @@ static void _free_longopts(struct option *longopts,
   struct option *p = longopts;
 
   while (p && p->name) {
-    free(p->name);
+    free((char *)p->name); /* willingly discard 'const' */
     if (bound_variable_name[i]) {
       free(bound_variable_name[i]);
     }
@@ -371,6 +367,7 @@ static void _set_lua_variable(lua_State *l, char *name, int value)
 	lua_pop(l, 1);              // pop the local's old value
 	lua_pushnumber(l, value);  // push the new value
 	lua_setlocal(l, &ar, i-1); // set the value (note: i was incremented)
+	lua_pop(l, 2);
 	return;
       }
       lua_pop(l, 1);
@@ -380,6 +377,7 @@ static void _set_lua_variable(lua_State *l, char *name, int value)
   /* Didn't find a local with that name anywhere. Set it as a global. */
   lua_pushnumber(l, value);
   lua_setglobal(l, name);
+  lua_pop(l, 3);
 }
 
 /* Remove num args from args[], starting at [1] */
@@ -405,11 +403,88 @@ static void _remove_args(lua_State *l, int num)
     lua_pushnil(l);
     lua_rawseti(l, tbl_idx, i);
   }
+  lua_pop(l, 1);
 }
 
+static void _call_callback(lua_State *l, int table_idx, 
+			   struct option *longopts)
+{
+  /* Run through the list of options; first that matches
+   * longopts->name, see if it's got a callback; if it does, call
+   * it. */
 
+  lua_pushnil(l);
+  while (lua_next(l, table_idx) != 0) {
+    // -2 is <key>; -1 is <val>
+    if (lua_istable(l, -1)) {
+      int this_table = lua_gettop(l);
+      const char *sval = _safe_string(l, -2);
+      if (!strcmp(sval, longopts->name)) {
+	lua_pushstring(l, "callback");
+	lua_gettable(l, this_table);
+	if (lua_isfunction(l, -1)) {
+	  lua_pushinteger(l, optind);
+	  lua_call(l, 1, 1); // 1 argument, 1 result. Not protecting against errors.
+	  
+	  /* FIXME: if it returns something non-nil, should we stop processing? */
+	}
+	lua_pop(l, 3);
+	return;
+      }
+    }
+    lua_pop(l, 1);
+  }
+}
 
-/* bool result = getopt.long("opts", longopts_in, opts_out)
+static int loptind(lua_State *l)
+{
+  lua_pushnumber(l, optind);
+  return 1;
+}
+
+static int lsoptind(lua_State *l)
+{
+  optind = lua_tointeger(l, 1);
+  return 0;
+}
+
+static int loptopt(lua_State *l)
+{
+  lua_pushnumber(l, optopt);
+  return 1;
+}
+
+static int lopterr(lua_State *l)
+{
+  lua_pushnumber(l, opterr);
+  return 1;
+}
+
+#ifdef _BSD_SOURCE
+static int loptreset(lua_State *l)
+{
+  lua_pushnumber(l, optreset);
+  return 1;
+}
+
+static int lsoptreset(lua_State *l)
+{
+  optreset = lua_tointeger(l, 1);
+  return 0;
+}
+#endif
+
+static int loptarg(lua_State *l)
+{
+  if (optarg) {
+    lua_pushstring(l, optarg);
+  } else {
+    lua_pushnil(l);
+  }
+  return 1;
+}
+
+/* bool result = getopt.long("opts", longopts_in, opts_out, error_function)
  *
  * Uses the libc getopt_long() call and stuffs results in the given table.
  * Modifies the global arg[], removing any options that were processed by 
@@ -417,22 +492,35 @@ static void _remove_args(lua_State *l, int num)
  * manually after a "--" argument.)
  */
 
-static int lgetopt_long(lua_State *l)
+typedef int (*func_t)(int argc, char * const *argv, const char *optstring,
+		      const struct option *longopts, int *longindex);
+
+static int lgetopt_long_t(lua_State *l, func_t func)
 {
   const char *optstring = NULL;
   int result = 1; /* assume success */
   int argc, ch, idx;
   char **argv = NULL;
+  int error_func = 0;
 
   int numargs = lua_gettop(l);
-  if (numargs != 3 ||
+  if ((numargs != 3 && numargs != 4) ||
       lua_type(l,1) != LUA_TSTRING ||
       lua_type(l,2) != LUA_TTABLE ||
       lua_type(l,3) != LUA_TTABLE) {
-    ERROR("usage: getopt.long(optionstring, longopts, resulttable)");
+    ERROR("usage: getopt.long(optionstring, longopts, resulttable, [errorfunc])");
+  }
+  if (numargs == 4 &&
+      lua_type(l,4) != LUA_TFUNCTION) {
+    ERROR("usage: getopt.long(optionstring, longopts, resulttable, [errorfunc])");
+  }
+  if (numargs == 4) {
+    // We can't copy the error function - but we can make a
+    // registry pointer.
+    error_func = luaL_ref(l, LUA_REGISTRYINDEX);
   }
 
-  optstring = tostring(l, 1);
+  optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
   lua_getfield(l, LUA_GLOBALSINDEX, "arg");
@@ -447,16 +535,26 @@ static int lgetopt_long(lua_State *l)
 					    &bound_variable_value);
 
   /* Parse the options and store them in the Lua table. */
-  while ((ch=getopt_long(argc, argv, optstring, longopts, &idx)) != -1) {
+  while ((ch=func(argc, argv, optstring, longopts, &idx)) != -1) {
     char buf[2] = { ch, 0 };
 
     if (ch == '?' || ch == ':') {
       /* This is a special "got a bad option" character. Don't put it 
        * in the table of results; just record that there's a failure.
        * The getopt call will have emitted an error to stderr. */
+
+      if (numargs == 4) {
+	lua_rawgeti(l, LUA_REGISTRYINDEX, error_func);
+	lua_pushinteger(l, ch);
+	lua_call(l, 1, 0); // 1 argument, 0 results. Not protecting against errors.
+      }
+
       result = 0;
       continue;
     }
+
+    /* Call any available callbacks for this element. */
+    _call_callback(l, 2, &longopts[idx]);
 
     if (ch == 0) {
       /* This is the special "bound a variable" character. Don't put 
@@ -478,7 +576,13 @@ static int lgetopt_long(lua_State *l)
   _free_args(argc, argv);
 
   /* Update args[] to remove the arguments we parsed */
-  _remove_args(l, optind-1);
+  // decided I don't like this behavior. Instead, caller should get back optind
+  // somehow and do it themselves.
+  //  _remove_args(l, optind-1);
+
+  if (numargs == 4) {
+    luaL_unref(l, LUA_REGISTRYINDEX, error_func);
+  }
 
   /* Return 1 item on the stack (boolean) */
   lua_pushboolean(l, result);
@@ -486,6 +590,15 @@ static int lgetopt_long(lua_State *l)
   return 1; /* # of arguments returned on stack */
 }
 
+static int lgetopt_long(lua_State *l)
+{
+  return lgetopt_long_t(l, getopt_long);
+}
+
+static int lgetopt_long_only(lua_State *l)
+{
+  return lgetopt_long_t(l, getopt_long_only);
+}
 
 /* metatable, hook for calling gc_context on context structs */
 static const luaL_reg meta[] = {
@@ -495,10 +608,20 @@ static const luaL_reg meta[] = {
 
 /* function table for this module */
 static const struct luaL_reg methods[] = {
-  { "version",      version      },
-  { "std",          lgetopt_std  },
-  { "long",         lgetopt_long },
-  { NULL,           NULL         }
+  { "version",      version           },
+  { "std",          lgetopt_std       },
+  { "long",         lgetopt_long      },
+  { "long_only",    lgetopt_long_only },
+  { "get_optind",   loptind           },
+  { "set_optind",   lsoptind          },
+  { "get_optopt",   loptopt           },
+  { "get_opterr",   lopterr           },
+#ifdef _BSD_SOURCE
+  { "get_optreset", loptreset         },
+  { "set_optreset", lsoptreset        },
+#endif
+  { "get_optarg",   loptarg           },
+  { NULL,           NULL              }
 };
 
 /* Module initializer, called from Lua when the module is loaded. */
