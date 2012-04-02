@@ -23,7 +23,7 @@ CPATH=/usr/local/lib/lua/5.1
 BRANCH_VERSION=.branch_version
 BUILD_VERSION=.build_version
 TARGET=getopt.so
-OBJS=getopt.o argv.o options.o
+OBJS=getopt.o argv.o options.o set-lua-variable.o
 
 all: $(TARGET)
 
@@ -43,11 +43,13 @@ $(TARGET): version $(OBJS)
 	$(CC) $(CFLAGS) -DVERSION="\"$$(cat VERSION).$$(cat $(BRANCH_VERSION))-$$(cat $(BUILD_VERSION))\"" -fno-common -c $< -o $@
 
 # Dependencies
-getopt.c: argv.c argv.h options.c options.h
+getopt.c: argv.c argv.h options.c options.h set-lua-variable.c set-lua-variable.h
 
 argv.c: argv.h
 
 options.c: options.h
+
+set-lua-variable.c: set-lua-variable.h
 
 # build_version stuff
 .PHONY: version branch_version

@@ -9,6 +9,7 @@
 
 #include "argv.h"
 #include "options.h"
+#include "set-lua-variable.h"
 
 #define MODULENAME      "getopt"
 
@@ -57,7 +58,7 @@ static int lgetopt_std(lua_State *l)
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
   lua_getfield(l, LUA_GLOBALSINDEX, "arg");
-  _construct_args(l, lua_gettop(l), &argc, &argv);
+  construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
   /* Parse the options and store them in the Lua table. */
@@ -80,60 +81,12 @@ static int lgetopt_std(lua_State *l)
     lua_setfield(l, 2, buf);
   }
 
-  _free_args(argc, argv);
+  free_args(argc, argv);
 
   /* Return 1 item on the stack (boolean) */
   lua_pushboolean(l, result);
 
   return 1; /* # of arguments returned on stack */
-}
-
-static int _get_call_stack_size(lua_State *l)
-{
-  int level = 0;
-  lua_Debug ar;
-  
-  while (1) {
-    if (lua_getstack(l, level, &ar) == 0) return level;
-    level++;
-  }
-  /* NOTREACHED */
-}
-
-static void _set_lua_variable(lua_State *l, char *name, int value)
-{
-  /* See if there's a local variable that matches the given name.
-   * If we find it, then set the value. If not, we'll keep walking back
-   * up the stack levels until we've exhausted all of the closures.
-   * At that point, set a global instead. */
-
-  lua_Debug ar;
-  int stacksize = _get_call_stack_size(l);
-  int stacklevel,i;
-
-  /* This C call is stacklevel 0; the function that called is, 1; and so on. */
-  for (stacklevel=0; stacklevel<stacksize; stacklevel++) {
-    const char *local_name;
-    lua_getstack(l, stacklevel, &ar);
-    lua_getinfo(l, "nSluf", &ar); /* get all the info there is. Could probably be whittled down. */
-    i=1;
-    while ( (local_name=lua_getlocal(l, &ar, i++)) ) {
-      if (!strcmp(name, local_name)) {
-	/* Found the local! Set it, and exit. */
-	lua_pop(l, 1);              // pop the local's old value
-	lua_pushnumber(l, value);  // push the new value
-	lua_setlocal(l, &ar, i-1); // set the value (note: i was incremented)
-	lua_pop(l, 2);
-	return;
-      }
-      lua_pop(l, 1);
-    }
-  }  
-
-  /* Didn't find a local with that name anywhere. Set it as a global. */
-  lua_pushnumber(l, value);
-  lua_setglobal(l, name);
-  lua_pop(l, 3);
 }
 
 static void _call_callback(lua_State *l, int table_idx, 
@@ -256,15 +209,15 @@ static int lgetopt_long_t(lua_State *l, func_t func)
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
   lua_getfield(l, LUA_GLOBALSINDEX, "arg");
-  _construct_args(l, lua_gettop(l), &argc, &argv);
+  construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
   /* Construct a longopts struct from the one given. */
   char **bound_variable_name = NULL;
   int *bound_variable_value = NULL;
-  struct option *longopts = _build_longopts(l, 2, 
-					    &bound_variable_name,
-					    &bound_variable_value);
+  struct option *longopts = build_longopts(l, 2, 
+					   &bound_variable_name,
+					   &bound_variable_value);
 
   /* Parse the options and store them in the Lua table. */
   while ((ch=func(argc, argv, optstring, longopts, &idx)) != -1) {
@@ -292,7 +245,7 @@ static int lgetopt_long_t(lua_State *l, func_t func)
       /* This is the special "bound a variable" character. Don't put 
        * it in the table; look up the item at the right index and set it
        * appropriately. */
-      _set_lua_variable(l, bound_variable_name[idx], bound_variable_value[idx]);
+      set_lua_variable(l, bound_variable_name[idx], bound_variable_value[idx]);
       continue;
     }
     
@@ -304,8 +257,8 @@ static int lgetopt_long_t(lua_State *l, func_t func)
     lua_setfield(l, 3, buf);
   }
 
-  _free_longopts(longopts, bound_variable_name, bound_variable_value);
-  _free_args(argc, argv);
+  free_longopts(longopts, bound_variable_name, bound_variable_value);
+  free_args(argc, argv);
 
   /* Update args[] to remove the arguments we parsed */
   // decided I don't like this behavior. Instead, caller should get back optind

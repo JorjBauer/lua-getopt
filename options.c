@@ -114,10 +114,10 @@ static const char *_safe_string(lua_State *l, int idx)
   return ret;
 }
 
-struct option * _build_longopts(lua_State *l,
-				int table_idx,
-				char **bound_variable_name[],
-				int *bound_variable_value[])
+struct option * build_longopts(lua_State *l,
+			       int table_idx,
+			       char **bound_variable_name[],
+			       int *bound_variable_value[])
 {
   // Figure out the number of elements
   int num_opts = _count_options(l, table_idx);
@@ -155,9 +155,9 @@ struct option * _build_longopts(lua_State *l,
   return ret;
 }
 
-void _free_longopts(struct option *longopts, 
-		    char *bound_variable_name[],
-		    int bound_variable_value[])
+void free_longopts(struct option *longopts, 
+		   char *bound_variable_name[],
+		   int bound_variable_value[])
 {
   int i = 0;
   struct option *p = longopts;

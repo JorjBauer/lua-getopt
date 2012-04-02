@@ -36,7 +36,7 @@ static void _add_arg(int *argv_size, int *argcp, char **argvp[], const char *new
   (*argcp)++;
 }
 
-int _construct_args(lua_State *l, int idx, int *argcp, char ***argvp)
+int construct_args(lua_State *l, int idx, int *argcp, char ***argvp)
 {
   int i=0;
   int argv_size = 10;
@@ -83,7 +83,7 @@ int _construct_args(lua_State *l, int idx, int *argcp, char ***argvp)
   return i;
 }
 
-void _free_args(int argc, char *argv[])
+void free_args(int argc, char *argv[])
 {
   int i;
   for (i=0; i<argc; i++) {
