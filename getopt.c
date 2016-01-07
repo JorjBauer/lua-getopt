@@ -23,7 +23,7 @@
 #if LUA_VERSION_NUM == 501
 // Lua 5.1 has direct access to the lua globals; add a macro that makes 5.1 
 // work the same as 5.2 and above.
-#define lua_pushglobalstate(x) lua_pushvalue(x, LUA_GLOBALSINDEX)
+#define lua_pushglobaltable(x) lua_pushvalue(x, LUA_GLOBALSINDEX)
 #endif
 
 /* version = getopt.version()                                            
@@ -151,7 +151,7 @@ static int lopterr(lua_State *l)
   return 1;
 }
 
-#ifdef _BSD_SOURCE
+#if 0
 static int loptreset(lua_State *l)
 {
   lua_pushnumber(l, optreset);
@@ -308,7 +308,7 @@ static const struct luaL_Reg methods[] = {
   { "set_optind",   lsoptind          },
   { "get_optopt",   loptopt           },
   { "get_opterr",   lopterr           },
-#ifdef _BSD_SOURCE
+#if 0
   { "get_optreset", loptreset         },
   { "set_optreset", lsoptreset        },
 #endif
