@@ -20,6 +20,12 @@
 #define ERROR(x) { lua_pushstring(l, x); lua_error(l); }
 #define getn(L,n) (luaL_checktype(L, n, LUA_TTABLE), luaL_getn(L, n))
 
+#if LUA_VERSION_NUM == 501
+// Lua 5.1 has direct access to the lua globals; add a macro that makes 5.1 
+// work the same as 5.2 and above.
+#define lua_pushglobalstate(x) lua_pushvalue(x, LUA_GLOBALSINDEX)
+#endif
+
 /* version = getopt.version()                                            
  */
 static int version(lua_State *l)
@@ -57,7 +63,8 @@ static int lgetopt_std(lua_State *l)
   optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
-  lua_getfield(l, LUA_GLOBALSINDEX, "arg");
+  lua_pushglobaltable(l);
+  lua_getfield(l, -1, "arg");
   construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
@@ -95,7 +102,6 @@ static void _call_callback(lua_State *l, int table_idx,
   /* Run through the list of options; first that matches
    * longopts->name, see if it's got a callback; if it does, call
    * it. */
-
   lua_pushnil(l);
   while (lua_next(l, table_idx) != 0) {
     // -2 is <key>; -1 is <val>
@@ -103,7 +109,7 @@ static void _call_callback(lua_State *l, int table_idx,
       int this_table = lua_gettop(l);
       if (lua_isstring(l, -2)) {
 	const char *sval = lua_tostring(l, -2);
-	if (!strcmp(sval, longopts->name)) {
+	if (longopts->name && !strcmp(sval, longopts->name)) {
 	  lua_pushstring(l, "callback");
 	  lua_gettable(l, this_table);
 	  if (lua_isfunction(l, -1)) {
@@ -172,9 +178,6 @@ static int loptarg(lua_State *l)
 /* bool result = getopt.long("opts", longopts_in, opts_out, error_function)
  *
  * Uses the libc getopt_long() call and stuffs results in the given table.
- * Modifies the global arg[], removing any options that were processed by 
- * getopt.long(). (This enables the caller to process the remaining arguemnts
- * manually after a "--" argument.)
  */
 
 typedef int (*func_t)(int argc, char * const *argv, const char *optstring,
@@ -208,7 +211,8 @@ static int lgetopt_long_t(lua_State *l, func_t func)
   optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
-  lua_getfield(l, LUA_GLOBALSINDEX, "arg");
+  lua_pushglobaltable(l);
+  lua_getfield(l, -1, "arg");
   construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
@@ -223,6 +227,8 @@ static int lgetopt_long_t(lua_State *l, func_t func)
   while ((ch=func(argc, argv, optstring, longopts, &idx)) != -1) {
     char buf[2] = { ch, 0 };
 
+    printf("ch is %c; idx %d\n", ch, idx);
+
     if (ch == '?' || ch == ':') {
       /* This is a special "got a bad option" character. Don't put it 
        * in the table of results; just record that there's a failure.
@@ -235,7 +241,8 @@ static int lgetopt_long_t(lua_State *l, func_t func)
       }
 
       result = 0;
-      continue;
+      printf("breaking\n");
+      break;
     }
 
     /* Call any available callbacks for this element. */
@@ -286,13 +293,13 @@ static int lgetopt_long_only(lua_State *l)
 }
 
 /* metatable, hook for calling gc_context on context structs */
-static const luaL_reg meta[] = {
+static const luaL_Reg meta[] = {
   /*  { "__gc", gc_context }, */
   { NULL,   NULL        }
 };
 
 /* function table for this module */
-static const struct luaL_reg methods[] = {
+static const struct luaL_Reg methods[] = {
   { "version",      version           },
   { "std",          lgetopt_std       },
   { "long",         lgetopt_long      },
@@ -315,12 +322,23 @@ int luaopen_getopt(lua_State *l)
   /* Construct a new namespace table for Lua, and register it as the global 
    * named "getopt".
    */
+#if LUA_VERSION_NUM == 501
   luaL_openlib(l, MODULENAME, methods, 0);
+#else
+  lua_newtable(l);
+  luaL_setfuncs(l, methods, 0);
+#endif
 
   /* Create metatable, which is used to tie C data structures to our garbage 
    * collection function. */
   luaL_newmetatable(l, MODULENAME);
+
+#if LUA_VERSION_NUM == 501
   luaL_openlib(l, 0, meta, 0);
+#else
+  luaL_setfuncs(l, meta, 0);
+#endif
+
   lua_pushliteral(l, "__index");
   lua_pushvalue(l, -3);               /* dup methods table*/
   lua_rawset(l, -3);                  /* metatable.__index = methods */
@@ -329,6 +347,7 @@ int luaopen_getopt(lua_State *l)
   lua_rawset(l, -3);                  /* hide metatable:
                                          metatable.__metatable = methods */
   lua_pop(l, 1);                      /* drop metatable */
+
   return 1;                           /* return methods on the stack */
 
 }

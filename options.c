@@ -139,12 +139,13 @@ struct option * build_longopts(lua_State *l,
     // key is -2, value is -1; don't lua_tolstring() numbers!
     const char *keyname = _safe_string(l, -2);
     p->name = keyname;
-    
+
     // The value (idx==-1) is a table. Use the values in that table to 
     // populate the rest of the struct
     _populate_option(l, p, &(*bound_variable_name)[i], 
 		     &(*bound_variable_value)[i],
 		     lua_gettop(l));
+
     lua_pop(l, 1); // pop value; leave key
     i++;
   }
