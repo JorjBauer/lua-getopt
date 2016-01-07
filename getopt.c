@@ -20,12 +20,6 @@
 #define ERROR(x) { lua_pushstring(l, x); lua_error(l); }
 #define getn(L,n) (luaL_checktype(L, n, LUA_TTABLE), luaL_getn(L, n))
 
-#if LUA_VERSION_NUM == 501
-// Lua 5.1 has direct access to the lua globals; add a macro that makes 5.1 
-// work the same as 5.2 and above.
-#define lua_pushglobaltable(x) lua_pushvalue(x, LUA_GLOBALSINDEX)
-#endif
-
 /* version = getopt.version()                                            
  */
 static int version(lua_State *l)
@@ -63,8 +57,7 @@ static int lgetopt_std(lua_State *l)
   optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
-  lua_pushglobaltable(l);
-  lua_getfield(l, -1, "arg");
+  lua_getglobal(l, "arg");
   construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
@@ -211,8 +204,7 @@ static int lgetopt_long_t(lua_State *l, func_t func)
   optstring = lua_tostring(l, 1);
 
   /* Construct fake argc/argv from the magic lua 'arg' table. */
-  lua_pushglobaltable(l);
-  lua_getfield(l, -1, "arg");
+  lua_getglobal(l, "arg");
   construct_args(l, lua_gettop(l), &argc, &argv);
   lua_pop(l, 1);
 
