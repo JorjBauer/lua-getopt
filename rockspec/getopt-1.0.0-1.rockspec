@@ -1,7 +1,7 @@
 package = "getopt"
 version = "1.0.0-1"
 source = { 
-   url = "git://github.com/JorjBauer/getopt",
+   url = "git://github.com/JorjBauer/lua-getopt",
    tag = "v1.0.0"
 }
 description = {
