@@ -62,13 +62,14 @@ static int lgetopt_std(lua_State *l)
   lua_pop(l, 1);
 
   /* Parse the options and store them in the Lua table. */
-  while ((ch=getopt(argc, argv, optstring)) != -1) {
+  while ((ch=getopt(argc, argv, optstring)) > -1) {
     char buf[2] = { ch, 0 };
 
     if (ch == '?') {
       /* This is the special "got a bad option" character. Don't put it 
        * in the table of results; just record that there's a failure.
        * The getopt call will have emitted an error to stderr. */
+
       result = 0;
       continue;
     }
@@ -79,6 +80,20 @@ static int lgetopt_std(lua_State *l)
       lua_pushboolean(l, 1);
     }
     lua_setfield(l, 2, buf);
+  }
+
+  /* Since the default behavior of many (but not all) getopt libraries is to 
+   * reorder argv so that non-arguments are all at the end (unless 
+   * POSIXLY_CORRECT is set or the options string begins with a '+'), we'll
+   * go do that now. We do it by modifying the existing global table, which 
+   * will leave index [-1] alone if it's set (as it sometimes is). */
+
+  lua_getglobal(l, "arg");
+  int i;
+  for (i=0; i<argc; i++) {
+    lua_pushinteger(l, i);
+    lua_pushstring(l, argv[i]);
+    lua_rawset(l, -3);
   }
 
   free_args(argc, argv);
@@ -168,7 +183,7 @@ static int loptarg(lua_State *l)
   return 1;
 }
 
-/* bool result = getopt.long("opts", longopts_in, opts_out, error_function)
+/* bool result = getopt.long("opts", longopts_in[, opts_out[, error_function]])
  *
  * Uses the libc getopt_long() call and stuffs results in the given table.
  */
@@ -185,17 +200,20 @@ static int lgetopt_long_t(lua_State *l, func_t func)
   int error_func = 0;
 
   int numargs = lua_gettop(l);
-  if ((numargs != 3 && numargs != 4) ||
+  if ((numargs != 2 && numargs != 3 && numargs != 4) ||
       lua_type(l,1) != LUA_TSTRING ||
       lua_type(l,2) != LUA_TTABLE ||
-      lua_type(l,3) != LUA_TTABLE) {
-    ERROR("usage: getopt.long(optionstring, longopts, resulttable, [errorfunc])");
+      (numargs >= 3 && 
+       (lua_type(l,3) != LUA_TTABLE && 
+	lua_type(l,3) != LUA_TNIL))) {
+    ERROR("usage: getopt.long(optionstring, longopts[, resulttable[, errorfunc]])");
   }
   if (numargs == 4 &&
-      lua_type(l,4) != LUA_TFUNCTION) {
-    ERROR("usage: getopt.long(optionstring, longopts, resulttable, [errorfunc])");
+      lua_type(l,4) != LUA_TFUNCTION && 
+      lua_type(l,4) != LUA_TNIL) {
+    ERROR("usage: getopt.long(optionstring, longopts[, resulttable[, errorfunc]])");
   }
-  if (numargs == 4) {
+  if (numargs == 4 && lua_type(l,4) == LUA_TFUNCTION) {
     // We can't copy the error function - but we can make a
     // registry pointer.
     error_func = luaL_ref(l, LUA_REGISTRYINDEX);
@@ -216,55 +234,103 @@ static int lgetopt_long_t(lua_State *l, func_t func)
 					   &bound_variable_value);
 
   /* Parse the options and store them in the Lua table. */
-  while ((ch=func(argc, argv, optstring, longopts, &idx)) != -1) {
-    char buf[2] = { ch, 0 };
+  idx = -1; /* initialize idx to -1 so we can tell whether or not it's
+	     * updated by getopt_long (or whatever func() is) */
 
-    printf("ch is %c; idx %d\n", ch, idx);
+  while ((ch=func(argc, argv, optstring, longopts, &idx)) > -1) {
+    char buf[2] = { ch, 0 };
 
     if (ch == '?' || ch == ':') {
       /* This is a special "got a bad option" character. Don't put it 
        * in the table of results; just record that there's a failure.
        * The getopt call will have emitted an error to stderr. */
 
-      if (numargs == 4) {
+      if (error_func) {
 	lua_rawgeti(l, LUA_REGISTRYINDEX, error_func);
-	lua_pushinteger(l, ch);
+	lua_pushstring(l, buf);
 	lua_call(l, 1, 0); // 1 argument, 0 results. Not protecting against errors.
       }
 
       result = 0;
-      printf("breaking\n");
       break;
     }
 
-    /* Call any available callbacks for this element. */
-    _call_callback(l, 2, &longopts[idx]);
+    if (idx == -1) {
+      /* If idx == -1, then it wasn't updated by the library call;
+       * that happens if it matches a short option. We'll have to dig
+       * through and find it ourself.
+       */
+
+      struct option *l = longopts;
+      int i = 0;
+      while (l[i].name) {
+	if (l[i].val != 0 && l[i].val == ch) {
+	  idx = i;
+	  if (l[i].flag != NULL) {
+	    /* Fake the longopt "this is a bound variable thing" even
+	     * though it was called with a short variable? :/
+	     */
+	    ch = 0;
+	    *l[i].flag = l[i].val;
+	  }
+	  break;
+	}
+	i++;
+      }
+    } else {
+      /* If we matched a long option with a val set, but the 'ch' is zero,
+       * then we need to dig the character out of the option's "val" field
+       * so we can set the captured value appropriately in the return opts. 
+       */
+
+      if (longopts[idx].val) {
+	buf[0] = longopts[idx].val;
+      }
+    }
+
+    /* Call any available callbacks for this element, if we found the
+     * element in the longopts struct list. */
+    if (idx != -1) {
+      _call_callback(l, 2, &longopts[idx]);
+    }
+
+    /* Save the values in the user-specified return table. */
+    if (buf[0] && numargs >= 3 && lua_type(l,3) == LUA_TTABLE) {
+      if (optarg) {
+	lua_pushstring(l, optarg);
+      } else {
+	lua_pushboolean(l, 1);
+      }
+      lua_setfield(l, 3, buf);
+    }
 
     if (ch == 0) {
-      /* This is the special "bound a variable" character. Don't put 
-       * it in the table; look up the item at the right index and set it
-       * appropriately. */
+      /* This is the special "bound a variable" return value. Perform
+       * the bind. */
       set_lua_variable(l, bound_variable_name[idx], bound_variable_value[idx]);
-      continue;
     }
-    
-    if (optarg) {
-      lua_pushstring(l, optarg);
-    } else {
-      lua_pushboolean(l, 1);
-    }
-    lua_setfield(l, 3, buf);
+
+    idx = -1;
+  }
+
+  /* Since the default behavior of many (but not all) getopt libraries is to 
+   * reorder argv so that non-arguments are all at the end (unless 
+   * POSIXLY_CORRECT is set or the options string begins with a '+'), we'll
+   * go do that now. We do it by modifying the existing global table, which 
+   * will leave index [-1] in place if it's set (as it sometimes is). */
+
+  lua_getglobal(l, "arg");
+  int i;
+  for (i=0; i<argc; i++) {
+    lua_pushinteger(l, i);
+    lua_pushstring(l, argv[i]);
+    lua_rawset(l, -3);
   }
 
   free_longopts(longopts, bound_variable_name, bound_variable_value);
   free_args(argc, argv);
 
-  /* Update args[] to remove the arguments we parsed */
-  // decided I don't like this behavior. Instead, caller should get back optind
-  // somehow and do it themselves.
-  //  _remove_args(l, optind-1);
-
-  if (numargs == 4) {
+  if (error_func) {
     luaL_unref(l, LUA_REGISTRYINDEX, error_func);
   }
 
