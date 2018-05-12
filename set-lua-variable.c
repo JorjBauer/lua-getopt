@@ -44,7 +44,7 @@ void set_lua_variable(lua_State *l, char *name, int value)
       if (!strcmp(name, local_name)) {
 	/* Found the local! Set it, and exit. */
 	lua_pop(l, 1);              // pop the local's old value
-	lua_pushnumber(l, value);  // push the new value
+	lua_pushinteger(l, value);  // push the new value
 	lua_setlocal(l, &ar, i-1); // set the value (note: i was incremented)
 	lua_pop(l, 2);
 	return;
@@ -54,7 +54,7 @@ void set_lua_variable(lua_State *l, char *name, int value)
   }  
 
   /* Didn't find a local with that name anywhere. Set it as a global. */
-  lua_pushnumber(l, value);
+  lua_pushinteger(l, value);
   lua_setglobal(l, name);
   lua_pop(l, 3);
 }
