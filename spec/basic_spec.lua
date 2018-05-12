@@ -1,16 +1,15 @@
 #!/usr/bin/env busted
 
-arg[0] = arg[1]
+local basedir = arg[1]
+print("basedir starts as " .. basedir)
+basedir = basedir:gsub('[/\\]?[^/\\]+$', '') -- remove file name
+print("basedir becomes " .. basedir)
+local cmd = basedir .. "/../lib/test.lua"
 
-local basedir = require 'findbin' '/..'
 require 'lib' (basedir)
 require 'lib' (basedir .. '/lib')
 local io = require 'io'
 local posix = require 'posix'
-local path = require 'path'
-local cwd = path.currentdir()
-
-local cmd = cwd .. "/lib/test.lua"
 
 function popen3(path, ...)
    local r1, w1 = posix.pipe()
@@ -59,19 +58,19 @@ describe("test of short flags",
 	 function()
 	    it("runs a -h test that should be successful", 
 	       function()
-		  assert.equals("return code: true\nreturn { h=true }\n",
+		  assert.equals("return code: true\nh=true\n",
 				run_test("-h"))
 	       end
 	    )
 	    it("runs a -b test that should fail",
 	       function()
-		  assert.equals(cmd..": option requires an argument -- b\nreturn code: false\nreturn {  }\n",
+		  assert.equals(cmd..": option requires an argument -- b\nreturn code: false\n\n",
 		     run_test("-b"))
 	       end
 	    )
 	    it("runs a -b test that should succeed",
 	       function()
-		  assert.equals("return code: true\nreturn { b=\"foo\" }\n",
+		  assert.equals("return code: true\nb=foo\n",
 		     run_test("-b","foo"))
 	       end
 	    )

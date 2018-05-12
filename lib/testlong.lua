@@ -5,7 +5,8 @@ require 'lib' (basedir)
 require 'lib' (basedir .. '/lib')
 
 local getopt = require "getopt"
-local tu = require "tableUtils"
+require 'lib.schwartzianTransforms'
+
 --local posix = require "posix"
 --posix.setenv("POSIXLY_CORRECT", 1)
 
@@ -35,7 +36,7 @@ local longopts = { buffy = { has_arg = "no_argument",
 		   callback = { has_arg = "no_argument",
 				val = "c",
 				-- consume the next argument manually via a callback
-				callback = function(optind) print(">> I'm consuming the next argument manually: " .. tu.dump(arg[optind])); getopt.set_optind(getopt.get_optind()+1);  end
+				callback = function(optind) print(">> I'm consuming the next argument manually: " .. tostring(arg[optind])); getopt.set_optind(getopt.get_optind()+1);  end
 				},
 		   reqargcb = { has_arg = "required_argument",
 				val = "r",
@@ -51,14 +52,18 @@ local ret = getopt.long("a::cbf:r:", longopts, retopts,
 			function(ch) print(">> error?: " .. ch); end)
 
 if (ret) then
-   print "getopt.long return code: true"
+   print "return code: true"
 else
-   print "getopt.long return code: false"
+   print "return code: false"
 end
-print ("options: " .. tu.dump(retopts))
+io.write("options: ")
+print(table.concat(table.map(table.sort(table.keys(retopts)),
+                             function(t,k,r) table.insert(r, tostring(k) .. "=" .. tostring(retopts[k])); end),
+                   ";")
+   )
+
 print("daggerset==" .. daggerset)
 print("optind==" .. getopt.get_optind())
-print("args==" .. tu.dump(arg))
 
 local o = getopt.get_optind()
 while (arg[o]) do

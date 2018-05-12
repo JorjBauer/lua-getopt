@@ -1,16 +1,15 @@
 #!/usr/bin/env busted
 
-arg[0] = arg[1]
+local basedir = arg[1]
+print("basedir starts as " .. basedir)
+basedir = basedir:gsub('[/\\]?[^/\\]+$', '') -- remove file name
+print("basedir becomes " .. basedir)
+local cmd = basedir .. "/../lib/testlong.lua"
 
-local basedir = require 'findbin' '/..'
 require 'lib' (basedir)
 require 'lib' (basedir .. '/lib')
 local io = require 'io'
 local posix = require 'posix'
-local path = require 'path'
-local cwd = path.currentdir()
-
-local cmd = cwd .. "/lib/testlong.lua"
 
 function popen3(path, ...)
    local r1, w1 = posix.pipe()
@@ -59,37 +58,37 @@ describe("test of long flags",
 	 function()
 	    it("tests permutations of --buffy", 
 	       function()
-		  assert.equals("return code: true\noptions: return { b=true }\ndaggerset==0\noptind==2\n", 
+		  assert.equals("return code: true\noptions: b=true\ndaggerset==0\noptind==2\n", 
 				run_test("--buffy"))
-		  assert.equals("return code: true\noptions: return { b=true }\ndaggerset==0\noptind==2\n",
+		  assert.equals("return code: true\noptions: b=true\ndaggerset==0\noptind==2\n",
 				run_test("-b"))
 	       end
 	    )
 	    it("tests permutations of --fluoride",
 	       function()
-		  assert.equals("lua: option `--fluoride' requires an argument\n>> error?: 63\nreturn code: false\noptions: return {  }\ndaggerset==0\noptind==2\n",
+		  assert.equals("lua: option `--fluoride' requires an argument\n>> error?: ?\nreturn code: false\noptions: \ndaggerset==0\noptind==2\n",
 				run_test("--fluoride"))
-		  assert.equals("lua: option requires an argument -- f\n>> error?: 63\nreturn code: false\noptions: return {  }\ndaggerset==0\noptind==2\n",
+		  assert.equals("lua: option requires an argument -- f\n>> error?: ?\nreturn code: false\noptions: \ndaggerset==0\noptind==2\n",
 		     run_test("-f"))
-		  assert.equals("return code: true\noptions: return { f=\"foo\" }\ndaggerset==0\noptind==3\n",
+		  assert.equals("return code: true\noptions: f=foo\ndaggerset==0\noptind==3\n",
 				run_test("--fluoride", "foo"))
-		  assert.equals("return code: true\noptions: return { f=\"bar\" }\ndaggerset==0\noptind==3\n",
+		  assert.equals("return code: true\noptions: f=bar\ndaggerset==0\noptind==3\n",
 				run_test("-f", "bar"))
 	       end
 	    )
 	    it("tests permutations of --angel",
 	       function()
-		  assert.equals("return code: true\noptions: return { a=true }\ndaggerset==0\noptind==2\n",
+		  assert.equals("return code: true\noptions: a=true\ndaggerset==0\noptind==2\n",
 				run_test("--angel"))
-		  assert.equals("lua: invalid option -- a\n>> error?: 63\nreturn code: false\noptions: return {  }\ndaggerset==0\noptind==2\n",
+		  assert.equals("return code: true\noptions: a=true\ndaggerset==0\noptind==2\n",
 		     run_test("-a"))
-		  assert.equals("return code: true\noptions: return { a=\"baz\" }\ndaggerset==0\noptind==2\n",
+		  assert.equals("return code: true\noptions: a=baz\ndaggerset==0\noptind==2\n",
 				run_test("--angel=baz"))
 	       end
 	    )
 	    it("tests permutations of --daggerset",
 	       function()
-		  assert.equals("return code: true\noptions: return {  }\ndaggerset==1\noptind==2\n",
+		  assert.equals("return code: true\noptions: 1=true\ndaggerset==1\noptind==2\n",
 				run_test("--daggerset"))
 	       end
 	    )
