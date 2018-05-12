@@ -126,6 +126,7 @@ struct option * build_longopts(lua_State *l,
   *bound_variable_name = malloc(sizeof(char**) * num_opts);
   memset(*bound_variable_name, 0, sizeof(char **) * num_opts);
   *bound_variable_value = malloc(sizeof(int*) * num_opts);
+  memset(*bound_variable_value, 0, sizeof(int*) * num_opts);
 
   // alloc longopts, plus room for NULL terminator
   struct option *ret = malloc(sizeof(struct option) * num_opts+1);
