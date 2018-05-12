@@ -10,7 +10,7 @@ Installation instructions:
 
 You want to use luarocks. You can install this with a simple
 
-   # luarocks make rockspec/getopt-1.0.0-1.rockspec
+   # luarocks make rockspec/getopt-1.0.1-1.rockspec
 
 There is an included Makefile, which did work the last time I tested
 it; it's messy, error prone, and requires that you edit it to suit
@@ -20,7 +20,18 @@ your environment. YMMV.
 Bugs:
 *****
 
-* There is no test suite.
+* More tests need to be written! Things like...
+
+  o POSIXALLY_CORRECT environment variable (and leading '+') behavior
+  o intentionally passing invalid types of options to getopt.std and .long
+  o hacking optind during a callback
+  o more thorough optional argument testing (and short '::')
+  o error callback testing with returned ":" rather than "?"
+
+* The busted-based tests (in the spec/ subdirectory) are fragile. They
+  depend on output that's getopt-implementation-specific, and require
+  modules that aren't part of luarocks. (This is why I built the new
+  set of tests in the tests/ subdirectory without 'busted'.)
 
 * Much of this code is repurposed from my lua-cyrussasl module. Which
   means it should be abstracted in some common way, rather than
