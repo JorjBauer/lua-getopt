@@ -2,9 +2,9 @@ local type = type
 local pairs = pairs
 local tostring = tostring
 
-module ("tableUtils")
+local tu = {}
 
-local function dump(o,depth)
+function tu.dump(o,depth)
    if depth==nil then depth=2 end
    if type(o) == "table" then
       local s = "{\n"
@@ -13,7 +13,7 @@ local function dump(o,depth)
 	 for i=0,depth do
 	    s = s .. ' '
 	 end
-         s = s .. '[' ..k..'] = ' .. dump(v,depth+2) .. ",\n"
+         s = s .. '[' ..k..'] = ' .. tu.dump(v,depth+2) .. ",\n"
       end
       for i=0,depth-2 do
 	 s = s .. ' '
@@ -26,10 +26,8 @@ local function dump(o,depth)
    end
 end
 
-local methods = { dump = dump,
-	       };
+return tu
 
-return methods
 
 
 
