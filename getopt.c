@@ -137,7 +137,7 @@ static void _call_callback(lua_State *l, int table_idx,
 
 static int loptind(lua_State *l)
 {
-  lua_pushnumber(l, optind);
+  lua_pushinteger(l, optind);
   return 1;
 }
 
@@ -149,20 +149,20 @@ static int lsoptind(lua_State *l)
 
 static int loptopt(lua_State *l)
 {
-  lua_pushnumber(l, optopt);
+  lua_pushinteger(l, optopt);
   return 1;
 }
 
 static int lopterr(lua_State *l)
 {
-  lua_pushnumber(l, opterr);
+  lua_pushinteger(l, opterr);
   return 1;
 }
 
 #if 0
 static int loptreset(lua_State *l)
 {
-  lua_pushnumber(l, optreset);
+  lua_pushinteger(l, optreset);
   return 1;
 }
 
@@ -285,6 +285,10 @@ static int lgetopt_long_t(lua_State *l, func_t func)
 
       if (longopts[idx].val) {
 	buf[0] = longopts[idx].val;
+	if (longopts[idx].val <= 9) {
+	  /* Coerce to a character, rather than an integer */
+	  buf[0] += '0';
+	}
       }
     }
 
