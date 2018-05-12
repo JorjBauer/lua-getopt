@@ -1,6 +1,6 @@
 getopt library for Lua 5.1+
 
-(c) 2015 Jorj Bauer <jorj@jorj.org>
+(c) 2015-2018 Jorj Bauer <jorj@jorj.org>
 
 This is released under a BSD license; see the file LICENSE for details.
 
