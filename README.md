@@ -4,27 +4,27 @@ getopt library for Lua 5.1+
 
 This is released under a BSD license; see the file LICENSE for details.
 
-**************************
-Installation instructions:
-**************************
+# Installation instructions
 
 You want to use luarocks. You can install this with a simple
 
-   # luarocks make rockspec/getopt-1.0.1-1.rockspec
+```
+$ luarocks make rockspec/getopt-1.0.1-1.rockspec
+```
 
 There is an included Makefile, which did work the last time I tested
 it; it's messy, error prone, and requires that you edit it to suit
 your environment. YMMV.
 
-******
-Usage:
-******
+# Usage
 
 Short flags are trivial and function per the POSIX standard:
 
+``` lua
 local getopt = require 'getopt'
 local opts = {}
 local ret = getopt.std("h::b:a", opts)
+```
 
 ... at which point opts[] contains the flags that were passed in. In
 this case, 'h' has an optional argument; 'b' has a required argument;
@@ -34,6 +34,7 @@ Long flags require some additional setup. See the 'getopt_long' man
 page for general details about how this structure functions; the Lua
 structure mirrors the C structure.
 
+``` lua
 local getopt = require 'getopt'
 local opts = {}
 local longopts = { alpha = { has_arg = "no_argument",
@@ -54,11 +55,9 @@ local longopts = { alpha = { has_arg = "no_argument",
 			       val = "f" },
 		}
 local ret = getopt.long("ab:c:de:f", longopts, opts, nil)
+```
 
-
-*****
-Bugs:
-*****
+# Bugs
 
 * More tests need to be written! Things like...
 
