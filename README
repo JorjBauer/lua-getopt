@@ -16,6 +16,46 @@ There is an included Makefile, which did work the last time I tested
 it; it's messy, error prone, and requires that you edit it to suit
 your environment. YMMV.
 
+******
+Usage:
+******
+
+Short flags are trivial and function per the POSIX standard:
+
+local getopt = require 'getopt'
+local opts = {}
+local ret = getopt.std("h::b:a", opts)
+
+... at which point opts[] contains the flags that were passed in. In
+this case, 'h' has an optional argument; 'b' has a required argument;
+'a' has no argument.
+
+Long flags require some additional setup. See the 'getopt_long' man
+page for general details about how this structure functions; the Lua
+structure mirrors the C structure.
+
+local getopt = require 'getopt'
+local opts = {}
+local longopts = { alpha = { has_arg = "no_argument",
+			     val = "a" },
+		   bravo = { has_arg = "required_argument",
+			     val = "b" },
+		   charlie = { has_arg = "required_argument",
+			       flag = "charlie",
+			       val = "c" },
+		   delta = { has_arg = "no_argument",
+			     callback = function(__unused) callbackcount = callbackcount + 1; end,
+			     val = "d" },
+		   echo = { has_arg = "required_argument",
+			    callback = function(a) callbackarg = arg[a-1]; end,
+			    val = "e" },
+		   foxtrot = { has_arg = "no_argument",
+			       flag = "foxtrot",
+			       val = "f" },
+		}
+local ret = getopt.long("ab:c:de:f", longopts, opts, nil)
+
+
 *****
 Bugs:
 *****
